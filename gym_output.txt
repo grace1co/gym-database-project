@@ -1,0 +1,785 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+
+PS C:\Users\okoro1gc> sqlplus OKORO1GC/KqCma4fh9lBYJmbl@cps-orcl4.se.cmich.edu/orcl4
+
+SQL*Plus: Release 23.0.0.0.0 - Production on Fri May 1 21:30:11 2026
+Version 23.7.0.25.01
+
+Copyright (c) 1982, 2025, Oracle.  All rights reserved.
+
+Last Successful login time: Fri May 01 2026 21:27:13 -04:00
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+SQL> set linesize 150
+SQL>
+SQL> set pagesize 50
+SQL>
+SQL> set echo on
+SQL> @U:\SQL\project\gym.sql
+SQL> -- ITC 341
+SQL> -- Gym Membership Database Project
+SQL>
+SQL> -- drop tables if they exist
+SQL> BEGIN
+  2      EXECUTE IMMEDIATE 'DROP TABLE CheckIn CASCADE CONSTRAINTS';
+  3      EXECUTE IMMEDIATE 'DROP TABLE Membership CASCADE CONSTRAINTS';
+  4      EXECUTE IMMEDIATE 'DROP TABLE Member CASCADE CONSTRAINTS';
+  5      EXECUTE IMMEDIATE 'DROP TABLE Plan CASCADE CONSTRAINTS';
+  6      EXECUTE IMMEDIATE 'DROP TABLE GymLocation CASCADE CONSTRAINTS';
+  7  EXCEPTION
+  8      WHEN OTHERS THEN NULL;
+  9  END;
+ 10  /
+
+PL/SQL procedure successfully completed.
+
+SQL>
+SQL> CREATE TABLE GymLocation(
+  2      GymID NUMBER(5) PRIMARY KEY,
+  3      GymName VARCHAR2(50) NOT NULL
+  4  );
+
+Table created.
+
+SQL>
+SQL> CREATE TABLE Member (
+  2      MemberID NUMBER(5) PRIMARY KEY,
+  3      Name VARCHAR2(50) NOT NULL,
+  4      HomeGymID NUMBER(5),
+  5      CONSTRAINT member_homegym_fk FOREIGN KEY (HomeGymID)
+  6          REFERENCES GymLocation(GymID)
+  7  );
+
+Table created.
+
+SQL>
+SQL> CREATE TABLE Plan(
+  2      PlanID NUMBER(3) PRIMARY KEY,
+  3      PlanName VARCHAR2(30) NOT NULL UNIQUE,
+  4      AllowsGuest CHAR(1) DEFAULT 'N',
+  5      CONSTRAINT plan_guest_ck CHECK (AllowsGuest IN ('Y','N'))
+  6  );
+
+Table created.
+
+SQL>
+SQL> CREATE TABLE Membership (
+  2      MembershipID NUMBER(5) PRIMARY KEY,
+  3      MemberID NUMBER(5) NOT NULL,
+  4      PlanID NUMBER(3) NOT NULL,
+  5      Status VARCHAR2(10) DEFAULT 'ACTIVE',
+  6      CONSTRAINT membership_member_fk FOREIGN KEY (MemberID)
+  7          REFERENCES Member(MemberID),
+  8      CONSTRAINT membership_plan_fk FOREIGN KEY (PlanID)
+  9          REFERENCES Plan(PlanID),
+ 10      CONSTRAINT membership_status_ck CHECK (Status IN ('ACTIVE','EXPIRED','CANCELLED'))
+ 11  );
+
+Table created.
+
+SQL>
+SQL> CREATE TABLE CheckIn(
+  2      CheckInID NUMBER(8) PRIMARY KEY,
+  3      MemberID NUMBER(5) NOT NULL,
+  4      GymID NUMBER(5) NOT NULL,
+  5      CheckInTime TIMESTAMP DEFAULT SYSTIMESTAMP,
+  6      CONSTRAINT checkin_member_fk FOREIGN KEY (MemberID)
+  7          REFERENCES Member(MemberID),
+  8      CONSTRAINT checkin_gym_fk FOREIGN KEY (GymID)
+  9          REFERENCES GymLocation(GymID)
+ 10  );
+
+Table created.
+
+SQL>
+SQL> -- view for active members
+SQL> CREATE OR REPLACE VIEW ActiveMembers AS
+  2  SELECT m.MemberID, m.Name, p.PlanName, ms.Status
+  3  FROM Member m
+  4  JOIN Membership ms ON m.MemberID = ms.MemberID
+  5  JOIN Plan p ON ms.PlanID = p.PlanID
+  6  WHERE ms.Status = 'ACTIVE';
+
+View created.
+
+SQL>
+SQL> -- trigger to make sure member is active before checking in
+SQL> CREATE OR REPLACE TRIGGER trg_active_checkin
+  2  BEFORE INSERT ON CheckIn
+  3  FOR EACH ROW
+  4  DECLARE
+  5      v_count NUMBER;
+  6  BEGIN
+  7      SELECT COUNT(*) INTO v_count
+  8      FROM Membership
+  9      WHERE MemberID = :NEW.MemberID
+ 10        AND Status = 'ACTIVE';
+ 11
+ 12      IF v_count = 0 THEN
+ 13          RAISE_APPLICATION_ERROR(-20001, 'Member does not have an active membership');
+ 14      END IF;
+ 15  END;
+ 16  /
+
+Trigger created.
+
+SQL>
+SQL> -- base data
+SQL> INSERT INTO GymLocation VALUES (1, 'Planet Fitness Downtown');
+
+1 row created.
+
+SQL> INSERT INTO GymLocation VALUES (2, 'Planet Fitness Westside');
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO Plan VALUES (1, 'Basic', 'N');
+
+1 row created.
+
+SQL> INSERT INTO Plan VALUES (2, 'Black Card', 'Y');
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO Member VALUES (1001, 'Bob Smith', 1);
+
+1 row created.
+
+SQL> INSERT INTO Member VALUES (1002, 'Carol Davis', 2);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO Membership VALUES (5001, 1001, 2, 'ACTIVE');
+
+1 row created.
+
+SQL> INSERT INTO Membership VALUES (5002, 1002, 1, 'EXPIRED');
+
+1 row created.
+
+SQL>
+SQL> -- 100 extra members
+SQL> BEGIN
+  2      FOR i IN 3..102 LOOP
+  3          INSERT INTO Member (MemberID, Name, HomeGymID)
+  4          VALUES (
+  5              1000 + i,
+  6              CASE MOD(i, 20)
+  7                  WHEN 0 THEN 'Maya Johnson'
+  8                  WHEN 1 THEN 'James Smith'
+  9                  WHEN 2 THEN 'Maria Garcia'
+ 10                  WHEN 3 THEN 'Robert Johnson'
+ 11                  WHEN 4 THEN 'Linda Williams'
+ 12                  WHEN 5 THEN 'Michael Brown'
+ 13                  WHEN 6 THEN 'Barbara Jones'
+ 14                  WHEN 7 THEN 'William Miller'
+ 15                  WHEN 8 THEN 'Elizabeth Davis'
+ 16                  WHEN 9 THEN 'David Garcia'
+ 17                  WHEN 10 THEN 'Jennifer Rodriguez'
+ 18                  WHEN 11 THEN 'Richard Martinez'
+ 19                  WHEN 12 THEN 'Susan Wilson'
+ 20                  WHEN 13 THEN 'Thomas Anderson'
+ 21                  WHEN 14 THEN 'Lisa Taylor'
+ 22                  WHEN 15 THEN 'Daniel Martin'
+ 23                  WHEN 16 THEN 'Karen Lee'
+ 24                  WHEN 17 THEN 'Anthony White'
+ 25                  WHEN 18 THEN 'Sandra Clark'
+ 26                  ELSE 'Taylor Brooks'
+ 27              END || ' ' || i,
+ 28              CASE WHEN MOD(i,2)=0 THEN 1 ELSE 2 END
+ 29          );
+ 30      END LOOP;
+ 31  END;
+ 32  /
+
+PL/SQL procedure successfully completed.
+
+SQL>
+SQL> -- 100 matching memberships with active / expired / cancelled variation
+SQL> BEGIN
+  2      FOR i IN 3..102 LOOP
+  3          INSERT INTO Membership (MembershipID, MemberID, PlanID, Status)
+  4          VALUES (
+  5              5000 + i,
+  6              1000 + i,
+  7              CASE WHEN MOD(i,2)=0 THEN 1 ELSE 2 END,
+  8              CASE
+  9                  WHEN MOD(i,10)=0 THEN 'CANCELLED'
+ 10                  WHEN MOD(i,5)=0 THEN 'EXPIRED'
+ 11                  ELSE 'ACTIVE'
+ 12              END
+ 13          );
+ 14      END LOOP;
+ 15  END;
+ 16  /
+
+PL/SQL procedure successfully completed.
+
+SQL>
+SQL> -- check-in data for the presentation queries
+SQL> INSERT INTO CheckIn VALUES (1, 1001, 1, SYSTIMESTAMP);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (101, 1001, 1, SYSTIMESTAMP - 4);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (102, 1001, 1, SYSTIMESTAMP - 3);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (103, 1001, 2, SYSTIMESTAMP - 2);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (104, 1001, 1, SYSTIMESTAMP - 1);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO CheckIn VALUES (105, 1004, 2, SYSTIMESTAMP - 3);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (106, 1004, 2, SYSTIMESTAMP - 1);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO CheckIn VALUES (107, 1003, 1, SYSTIMESTAMP - 5);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (108, 1003, 1, SYSTIMESTAMP - 2);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO CheckIn VALUES (110, 1007, 1, SYSTIMESTAMP);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (111, 1009, 1, SYSTIMESTAMP);
+
+1 row created.
+
+SQL> INSERT INTO CheckIn VALUES (112, 1013, 1, SYSTIMESTAMP);
+
+1 row created.
+
+SQL>
+SQL> -- add 100 more check-ins for active members only
+SQL> DECLARE
+  2      v_member_id Member.MemberID%TYPE;
+  3  BEGIN
+  4      FOR i IN 200..299 LOOP
+  5          SELECT MemberID
+  6          INTO v_member_id
+  7          FROM (
+  8              SELECT MemberID, ROW_NUMBER() OVER (ORDER BY MemberID) AS rn
+  9              FROM Membership
+ 10              WHERE Status = 'ACTIVE'
+ 11          )
+ 12          WHERE rn = 1 + MOD(i, 81);
+ 13
+ 14          INSERT INTO CheckIn (CheckInID, MemberID, GymID, CheckInTime)
+ 15          VALUES (
+ 16              i,
+ 17              v_member_id,
+ 18              CASE WHEN MOD(i,2)=0 THEN 1 ELSE 2 END,
+ 19              SYSTIMESTAMP - NUMTODSINTERVAL(MOD(i,48), 'HOUR')
+ 20          );
+ 21      END LOOP;
+ 22  END;
+ 23  /
+
+PL/SQL procedure successfully completed.
+
+SQL>
+SQL> COMMIT;
+
+Commit complete.
+
+SQL>
+SQL> PROMPT ==== ROW COUNTS ====
+==== ROW COUNTS ====
+SQL> SELECT COUNT(*) AS TotalMembers FROM Member;
+
+TOTALMEMBERS
+------------
+         102
+
+SQL> SELECT COUNT(*) AS TotalMemberships FROM Membership;
+
+TOTALMEMBERSHIPS
+----------------
+             102
+
+SQL> SELECT COUNT(*) AS TotalCheckIns FROM CheckIn;
+
+TOTALCHECKINS
+-------------
+          112
+
+SQL>
+SQL> PROMPT ==== MEMBERSHIP STATUS TOTALS ====
+==== MEMBERSHIP STATUS TOTALS ====
+SQL> SELECT Status, COUNT(*) AS Total
+  2  FROM Membership
+  3  GROUP BY Status
+  4  ORDER BY Status;
+
+STATUS          TOTAL
+---------- ----------
+ACTIVE             81
+CANCELLED          10
+EXPIRED            11
+
+SQL>
+SQL> PROMPT ==== QUERY 1: THE ULTIMATE GYM RAT ====
+==== QUERY 1: THE ULTIMATE GYM RAT ====
+SQL> SELECT m.Name, COUNT(c.CheckInID) AS TotalWorkouts
+  2  FROM Member m
+  3  JOIN CheckIn c ON m.MemberID = c.MemberID
+  4  GROUP BY m.Name
+  5  ORDER BY TotalWorkouts DESC
+  6  FETCH FIRST 1 ROWS ONLY;
+
+NAME                                               TOTALWORKOUTS
+-------------------------------------------------- -------------
+Bob Smith                                                      6
+
+SQL>
+SQL> PROMPT ==== QUERY 2: MOST CROWDED LOCATION ====
+==== QUERY 2: MOST CROWDED LOCATION ====
+SQL> SELECT g.GymName, COUNT(c.CheckInID) AS FootTraffic
+  2  FROM GymLocation g
+  3  LEFT JOIN CheckIn c ON g.GymID = c.GymID
+  4  GROUP BY g.GymName
+  5  ORDER BY FootTraffic DESC
+  6  FETCH FIRST 1 ROWS ONLY;
+
+GYMNAME                                            FOOTTRAFFIC
+-------------------------------------------------- -----------
+Planet Fitness Downtown                                     59
+
+SQL>
+SQL> PROMPT ==== QUERY 3: GUEST PRIVILEGES ====
+==== QUERY 3: GUEST PRIVILEGES ====
+SQL> SELECT m.Name, p.PlanName
+  2  FROM Member m
+  3  JOIN Membership ms ON m.MemberID = ms.MemberID
+  4  JOIN Plan p ON ms.PlanID = p.PlanID
+  5  WHERE p.AllowsGuest = 'Y'
+  6    AND ms.Status = 'ACTIVE'
+  7  FETCH FIRST 10 ROWS ONLY;
+
+NAME                                               PLANNAME
+-------------------------------------------------- ------------------------------
+Bob Smith                                          Black Card
+Robert Johnson 3                                   Black Card
+William Miller 7                                   Black Card
+David Garcia 9                                     Black Card
+Richard Martinez 11                                Black Card
+Thomas Anderson 13                                 Black Card
+Anthony White 17                                   Black Card
+Taylor Brooks 19                                   Black Card
+James Smith 21                                     Black Card
+Robert Johnson 23                                  Black Card
+
+10 rows selected.
+
+SQL>
+SQL> PROMPT ==== QUERY 4: EXPIRED MEMBERS ====
+==== QUERY 4: EXPIRED MEMBERS ====
+SQL> SELECT m.Name, ms.Status
+  2  FROM Member m
+  3  JOIN Membership ms ON m.MemberID = ms.MemberID
+  4  WHERE ms.Status = 'EXPIRED'
+  5  FETCH FIRST 10 ROWS ONLY;
+
+NAME                                               STATUS
+-------------------------------------------------- ----------
+Carol Davis                                        EXPIRED
+Michael Brown 5                                    EXPIRED
+Daniel Martin 15                                   EXPIRED
+Michael Brown 25                                   EXPIRED
+Daniel Martin 35                                   EXPIRED
+Michael Brown 45                                   EXPIRED
+Daniel Martin 55                                   EXPIRED
+Michael Brown 65                                   EXPIRED
+Daniel Martin 75                                   EXPIRED
+Michael Brown 85                                   EXPIRED
+
+10 rows selected.
+
+SQL>
+SQL> PROMPT ==== TRIGGER TEST: THIS SHOULD FAIL ====
+==== TRIGGER TEST: THIS SHOULD FAIL ====
+SQL> INSERT INTO CheckIn VALUES (999, 1002, 2, SYSTIMESTAMP);
+INSERT INTO CheckIn VALUES (999, 1002, 2, SYSTIMESTAMP)
+            *
+ERROR at line 1:
+ORA-20001: Member does not have an active membership
+ORA-06512: at "OKORO1GC.TRG_ACTIVE_CHECKIN", line 10
+ORA-04088: error during execution of trigger 'OKORO1GC.TRG_ACTIVE_CHECKIN'
+
+
+SQL> SELECT COUNT(*) AS TotalMembers FROM Member;
+
+TOTALMEMBERS
+------------
+         102
+
+SQL> SELECT m.MemberID, m.Name, g.GymName, ms.Status
+  2  FROM Member m
+  3  LEFT JOIN GymLocation g ON m.HomeGymID = g.GymID
+  4  LEFT JOIN Membership ms ON m.MemberID = ms.MemberID
+  5  ORDER BY m.MemberID;
+
+  MEMBERID NAME                                               GYMNAME                                            STATUS
+---------- -------------------------------------------------- -------------------------------------------------- ----------
+      1001 Bob Smith                                          Planet Fitness Downtown                            ACTIVE
+      1002 Carol Davis                                        Planet Fitness Westside                            EXPIRED
+      1003 Robert Johnson 3                                   Planet Fitness Westside                            ACTIVE
+      1004 Linda Williams 4                                   Planet Fitness Downtown                            ACTIVE
+      1005 Michael Brown 5                                    Planet Fitness Westside                            EXPIRED
+      1006 Barbara Jones 6                                    Planet Fitness Downtown                            ACTIVE
+      1007 William Miller 7                                   Planet Fitness Westside                            ACTIVE
+      1008 Elizabeth Davis 8                                  Planet Fitness Downtown                            ACTIVE
+      1009 David Garcia 9                                     Planet Fitness Westside                            ACTIVE
+      1010 Jennifer Rodriguez 10                              Planet Fitness Downtown                            CANCELLED
+      1011 Richard Martinez 11                                Planet Fitness Westside                            ACTIVE
+      1012 Susan Wilson 12                                    Planet Fitness Downtown                            ACTIVE
+      1013 Thomas Anderson 13                                 Planet Fitness Westside                            ACTIVE
+      1014 Lisa Taylor 14                                     Planet Fitness Downtown                            ACTIVE
+      1015 Daniel Martin 15                                   Planet Fitness Westside                            EXPIRED
+      1016 Karen Lee 16                                       Planet Fitness Downtown                            ACTIVE
+      1017 Anthony White 17                                   Planet Fitness Westside                            ACTIVE
+      1018 Sandra Clark 18                                    Planet Fitness Downtown                            ACTIVE
+      1019 Taylor Brooks 19                                   Planet Fitness Westside                            ACTIVE
+      1020 Maya Johnson 20                                    Planet Fitness Downtown                            CANCELLED
+      1021 James Smith 21                                     Planet Fitness Westside                            ACTIVE
+      1022 Maria Garcia 22                                    Planet Fitness Downtown                            ACTIVE
+      1023 Robert Johnson 23                                  Planet Fitness Westside                            ACTIVE
+      1024 Linda Williams 24                                  Planet Fitness Downtown                            ACTIVE
+      1025 Michael Brown 25                                   Planet Fitness Westside                            EXPIRED
+      1026 Barbara Jones 26                                   Planet Fitness Downtown                            ACTIVE
+      1027 William Miller 27                                  Planet Fitness Westside                            ACTIVE
+      1028 Elizabeth Davis 28                                 Planet Fitness Downtown                            ACTIVE
+      1029 David Garcia 29                                    Planet Fitness Westside                            ACTIVE
+      1030 Jennifer Rodriguez 30                              Planet Fitness Downtown                            CANCELLED
+      1031 Richard Martinez 31                                Planet Fitness Westside                            ACTIVE
+      1032 Susan Wilson 32                                    Planet Fitness Downtown                            ACTIVE
+      1033 Thomas Anderson 33                                 Planet Fitness Westside                            ACTIVE
+      1034 Lisa Taylor 34                                     Planet Fitness Downtown                            ACTIVE
+      1035 Daniel Martin 35                                   Planet Fitness Westside                            EXPIRED
+      1036 Karen Lee 36                                       Planet Fitness Downtown                            ACTIVE
+      1037 Anthony White 37                                   Planet Fitness Westside                            ACTIVE
+      1038 Sandra Clark 38                                    Planet Fitness Downtown                            ACTIVE
+      1039 Taylor Brooks 39                                   Planet Fitness Westside                            ACTIVE
+      1040 Maya Johnson 40                                    Planet Fitness Downtown                            CANCELLED
+      1041 James Smith 41                                     Planet Fitness Westside                            ACTIVE
+      1042 Maria Garcia 42                                    Planet Fitness Downtown                            ACTIVE
+      1043 Robert Johnson 43                                  Planet Fitness Westside                            ACTIVE
+      1044 Linda Williams 44                                  Planet Fitness Downtown                            ACTIVE
+      1045 Michael Brown 45                                   Planet Fitness Westside                            EXPIRED
+      1046 Barbara Jones 46                                   Planet Fitness Downtown                            ACTIVE
+      1047 William Miller 47                                  Planet Fitness Westside                            ACTIVE
+
+  MEMBERID NAME                                               GYMNAME                                            STATUS
+---------- -------------------------------------------------- -------------------------------------------------- ----------
+      1048 Elizabeth Davis 48                                 Planet Fitness Downtown                            ACTIVE
+      1049 David Garcia 49                                    Planet Fitness Westside                            ACTIVE
+      1050 Jennifer Rodriguez 50                              Planet Fitness Downtown                            CANCELLED
+      1051 Richard Martinez 51                                Planet Fitness Westside                            ACTIVE
+      1052 Susan Wilson 52                                    Planet Fitness Downtown                            ACTIVE
+      1053 Thomas Anderson 53                                 Planet Fitness Westside                            ACTIVE
+      1054 Lisa Taylor 54                                     Planet Fitness Downtown                            ACTIVE
+      1055 Daniel Martin 55                                   Planet Fitness Westside                            EXPIRED
+      1056 Karen Lee 56                                       Planet Fitness Downtown                            ACTIVE
+      1057 Anthony White 57                                   Planet Fitness Westside                            ACTIVE
+      1058 Sandra Clark 58                                    Planet Fitness Downtown                            ACTIVE
+      1059 Taylor Brooks 59                                   Planet Fitness Westside                            ACTIVE
+      1060 Maya Johnson 60                                    Planet Fitness Downtown                            CANCELLED
+      1061 James Smith 61                                     Planet Fitness Westside                            ACTIVE
+      1062 Maria Garcia 62                                    Planet Fitness Downtown                            ACTIVE
+      1063 Robert Johnson 63                                  Planet Fitness Westside                            ACTIVE
+      1064 Linda Williams 64                                  Planet Fitness Downtown                            ACTIVE
+      1065 Michael Brown 65                                   Planet Fitness Westside                            EXPIRED
+      1066 Barbara Jones 66                                   Planet Fitness Downtown                            ACTIVE
+      1067 William Miller 67                                  Planet Fitness Westside                            ACTIVE
+      1068 Elizabeth Davis 68                                 Planet Fitness Downtown                            ACTIVE
+      1069 David Garcia 69                                    Planet Fitness Westside                            ACTIVE
+      1070 Jennifer Rodriguez 70                              Planet Fitness Downtown                            CANCELLED
+      1071 Richard Martinez 71                                Planet Fitness Westside                            ACTIVE
+      1072 Susan Wilson 72                                    Planet Fitness Downtown                            ACTIVE
+      1073 Thomas Anderson 73                                 Planet Fitness Westside                            ACTIVE
+      1074 Lisa Taylor 74                                     Planet Fitness Downtown                            ACTIVE
+      1075 Daniel Martin 75                                   Planet Fitness Westside                            EXPIRED
+      1076 Karen Lee 76                                       Planet Fitness Downtown                            ACTIVE
+      1077 Anthony White 77                                   Planet Fitness Westside                            ACTIVE
+      1078 Sandra Clark 78                                    Planet Fitness Downtown                            ACTIVE
+      1079 Taylor Brooks 79                                   Planet Fitness Westside                            ACTIVE
+      1080 Maya Johnson 80                                    Planet Fitness Downtown                            CANCELLED
+      1081 James Smith 81                                     Planet Fitness Westside                            ACTIVE
+      1082 Maria Garcia 82                                    Planet Fitness Downtown                            ACTIVE
+      1083 Robert Johnson 83                                  Planet Fitness Westside                            ACTIVE
+      1084 Linda Williams 84                                  Planet Fitness Downtown                            ACTIVE
+      1085 Michael Brown 85                                   Planet Fitness Westside                            EXPIRED
+      1086 Barbara Jones 86                                   Planet Fitness Downtown                            ACTIVE
+      1087 William Miller 87                                  Planet Fitness Westside                            ACTIVE
+      1088 Elizabeth Davis 88                                 Planet Fitness Downtown                            ACTIVE
+      1089 David Garcia 89                                    Planet Fitness Westside                            ACTIVE
+      1090 Jennifer Rodriguez 90                              Planet Fitness Downtown                            CANCELLED
+      1091 Richard Martinez 91                                Planet Fitness Westside                            ACTIVE
+      1092 Susan Wilson 92                                    Planet Fitness Downtown                            ACTIVE
+      1093 Thomas Anderson 93                                 Planet Fitness Westside                            ACTIVE
+      1094 Lisa Taylor 94                                     Planet Fitness Downtown                            ACTIVE
+
+  MEMBERID NAME                                               GYMNAME                                            STATUS
+---------- -------------------------------------------------- -------------------------------------------------- ----------
+      1095 Daniel Martin 95                                   Planet Fitness Westside                            EXPIRED
+      1096 Karen Lee 96                                       Planet Fitness Downtown                            ACTIVE
+      1097 Anthony White 97                                   Planet Fitness Westside                            ACTIVE
+      1098 Sandra Clark 98                                    Planet Fitness Downtown                            ACTIVE
+      1099 Taylor Brooks 99                                   Planet Fitness Westside                            ACTIVE
+      1100 Maya Johnson 100                                   Planet Fitness Downtown                            CANCELLED
+      1101 James Smith 101                                    Planet Fitness Westside                            ACTIVE
+      1102 Maria Garcia 102                                   Planet Fitness Downtown                            ACTIVE
+
+102 rows selected.
+
+SQL> SELECT * FROM ActiveMembers;
+
+  MEMBERID NAME                                               PLANNAME                       STATUS
+---------- -------------------------------------------------- ------------------------------ ----------
+      1001 Bob Smith                                          Black Card                     ACTIVE
+      1003 Robert Johnson 3                                   Black Card                     ACTIVE
+      1004 Linda Williams 4                                   Basic                          ACTIVE
+      1006 Barbara Jones 6                                    Basic                          ACTIVE
+      1007 William Miller 7                                   Black Card                     ACTIVE
+      1008 Elizabeth Davis 8                                  Basic                          ACTIVE
+      1009 David Garcia 9                                     Black Card                     ACTIVE
+      1011 Richard Martinez 11                                Black Card                     ACTIVE
+      1012 Susan Wilson 12                                    Basic                          ACTIVE
+      1013 Thomas Anderson 13                                 Black Card                     ACTIVE
+      1014 Lisa Taylor 14                                     Basic                          ACTIVE
+      1016 Karen Lee 16                                       Basic                          ACTIVE
+      1017 Anthony White 17                                   Black Card                     ACTIVE
+      1018 Sandra Clark 18                                    Basic                          ACTIVE
+      1019 Taylor Brooks 19                                   Black Card                     ACTIVE
+      1021 James Smith 21                                     Black Card                     ACTIVE
+      1022 Maria Garcia 22                                    Basic                          ACTIVE
+      1023 Robert Johnson 23                                  Black Card                     ACTIVE
+      1024 Linda Williams 24                                  Basic                          ACTIVE
+      1026 Barbara Jones 26                                   Basic                          ACTIVE
+      1027 William Miller 27                                  Black Card                     ACTIVE
+      1028 Elizabeth Davis 28                                 Basic                          ACTIVE
+      1029 David Garcia 29                                    Black Card                     ACTIVE
+      1031 Richard Martinez 31                                Black Card                     ACTIVE
+      1032 Susan Wilson 32                                    Basic                          ACTIVE
+      1033 Thomas Anderson 33                                 Black Card                     ACTIVE
+      1034 Lisa Taylor 34                                     Basic                          ACTIVE
+      1036 Karen Lee 36                                       Basic                          ACTIVE
+      1037 Anthony White 37                                   Black Card                     ACTIVE
+      1038 Sandra Clark 38                                    Basic                          ACTIVE
+      1039 Taylor Brooks 39                                   Black Card                     ACTIVE
+      1041 James Smith 41                                     Black Card                     ACTIVE
+      1042 Maria Garcia 42                                    Basic                          ACTIVE
+      1043 Robert Johnson 43                                  Black Card                     ACTIVE
+      1044 Linda Williams 44                                  Basic                          ACTIVE
+      1046 Barbara Jones 46                                   Basic                          ACTIVE
+      1047 William Miller 47                                  Black Card                     ACTIVE
+      1048 Elizabeth Davis 48                                 Basic                          ACTIVE
+      1049 David Garcia 49                                    Black Card                     ACTIVE
+      1051 Richard Martinez 51                                Black Card                     ACTIVE
+      1052 Susan Wilson 52                                    Basic                          ACTIVE
+      1053 Thomas Anderson 53                                 Black Card                     ACTIVE
+      1054 Lisa Taylor 54                                     Basic                          ACTIVE
+      1056 Karen Lee 56                                       Basic                          ACTIVE
+      1057 Anthony White 57                                   Black Card                     ACTIVE
+      1058 Sandra Clark 58                                    Basic                          ACTIVE
+      1059 Taylor Brooks 59                                   Black Card                     ACTIVE
+
+  MEMBERID NAME                                               PLANNAME                       STATUS
+---------- -------------------------------------------------- ------------------------------ ----------
+      1061 James Smith 61                                     Black Card                     ACTIVE
+      1062 Maria Garcia 62                                    Basic                          ACTIVE
+      1063 Robert Johnson 63                                  Black Card                     ACTIVE
+      1064 Linda Williams 64                                  Basic                          ACTIVE
+      1066 Barbara Jones 66                                   Basic                          ACTIVE
+      1067 William Miller 67                                  Black Card                     ACTIVE
+      1068 Elizabeth Davis 68                                 Basic                          ACTIVE
+      1069 David Garcia 69                                    Black Card                     ACTIVE
+      1071 Richard Martinez 71                                Black Card                     ACTIVE
+      1072 Susan Wilson 72                                    Basic                          ACTIVE
+      1073 Thomas Anderson 73                                 Black Card                     ACTIVE
+      1074 Lisa Taylor 74                                     Basic                          ACTIVE
+      1076 Karen Lee 76                                       Basic                          ACTIVE
+      1077 Anthony White 77                                   Black Card                     ACTIVE
+      1078 Sandra Clark 78                                    Basic                          ACTIVE
+      1079 Taylor Brooks 79                                   Black Card                     ACTIVE
+      1081 James Smith 81                                     Black Card                     ACTIVE
+      1082 Maria Garcia 82                                    Basic                          ACTIVE
+      1083 Robert Johnson 83                                  Black Card                     ACTIVE
+      1084 Linda Williams 84                                  Basic                          ACTIVE
+      1086 Barbara Jones 86                                   Basic                          ACTIVE
+      1087 William Miller 87                                  Black Card                     ACTIVE
+      1088 Elizabeth Davis 88                                 Basic                          ACTIVE
+      1089 David Garcia 89                                    Black Card                     ACTIVE
+      1091 Richard Martinez 91                                Black Card                     ACTIVE
+      1092 Susan Wilson 92                                    Basic                          ACTIVE
+      1093 Thomas Anderson 93                                 Black Card                     ACTIVE
+      1094 Lisa Taylor 94                                     Basic                          ACTIVE
+      1096 Karen Lee 96                                       Basic                          ACTIVE
+      1097 Anthony White 97                                   Black Card                     ACTIVE
+      1098 Sandra Clark 98                                    Basic                          ACTIVE
+      1099 Taylor Brooks 99                                   Black Card                     ACTIVE
+      1101 James Smith 101                                    Black Card                     ACTIVE
+      1102 Maria Garcia 102                                   Basic                          ACTIVE
+
+81 rows selected.
+
+SQL> SELECT COUNT(*) AS TotalCheckIns
+  2  FROM CheckIn;
+
+TOTALCHECKINS
+-------------
+          112
+
+SQL> INSERT INTO CheckIn (CheckInID, MemberID, GymID, CheckInTime)
+  2  VALUES (999, 1002, 2, SYSTIMESTAMP);
+INSERT INTO CheckIn (CheckInID, MemberID, GymID, CheckInTime)
+            *
+ERROR at line 1:
+ORA-20001: Member does not have an active membership
+ORA-06512: at "OKORO1GC.TRG_ACTIVE_CHECKIN", line 10
+ORA-04088: error during execution of trigger 'OKORO1GC.TRG_ACTIVE_CHECKIN'
+
+
+SQL> INSERT INTO Member (MemberID, Name, HomeGymID)
+  2  VALUES (1200, 'Test User', 1);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO Membership (MembershipID, MemberID, PlanID, Status)
+  2  VALUES (6000, 1200, 2, 'ACTIVE'); COMMIT;
+VALUES (6000, 1200, 2, 'ACTIVE'); COMMIT
+                                *
+ERROR at line 2:
+ORA-00933: SQL command not properly ended
+Help: https://docs.oracle.com/error-help/db/ora-00933/
+
+
+SQL>
+SQL> INSERT INTO Member (MemberID, Name, HomeGymID)
+  2  VALUES (1200, 'Test User', 1);
+INSERT INTO Member (MemberID, Name, HomeGymID)
+*
+ERROR at line 1:
+ORA-00001: unique constraint (OKORO1GC.SYS_C00186492) violated
+Help: https://docs.oracle.com/error-help/db/ora-00001/
+
+
+SQL>
+SQL> INSERT INTO Membership (MembershipID, MemberID, PlanID, Status)
+  2  VALUES (6000, 1200, 2, 'ACTIVE');
+
+1 row created.
+
+SQL>
+SQL> COMMIT;
+
+Commit complete.
+
+SQL> SELECT * FROM Member WHERE MemberID = 1300;
+
+  MEMBERID NAME                                                HOMEGYMID
+---------- -------------------------------------------------- ----------
+      1300 T User                                                      2
+
+SQL> DELETE FROM CheckIn WHERE MemberID = 1300;
+
+0 rows deleted.
+
+SQL> DELETE FROM GuestCheckIn WHERE MemberID = 1300;
+
+0 rows deleted.
+
+SQL> DELETE FROM Payment WHERE MemberID = 1300;
+
+0 rows deleted.
+
+SQL> DELETE FROM Membership WHERE MemberID = 1300;
+
+1 row deleted.
+
+SQL> DELETE FROM Member WHERE MemberID = 1300;
+
+1 row deleted.
+
+SQL>
+SQL> DELETE FROM CheckIn WHERE MemberID = 1200;
+
+0 rows deleted.
+
+SQL> DELETE FROM GuestCheckIn WHERE MemberID = 1200;
+
+0 rows deleted.
+
+SQL> DELETE FROM Payment WHERE MemberID = 1200;
+
+0 rows deleted.
+
+SQL> DELETE FROM Membership WHERE MemberID = 1200;
+
+1 row deleted.
+
+SQL> DELETE FROM Member WHERE MemberID = 1200;
+
+1 row deleted.
+
+SQL>
+SQL> COMMIT;
+
+Commit complete.
+
+SQL> INSERT INTO Member (MemberID, Name, HomeGymID)
+  2  VALUES (1200, 'Test User', 1);
+
+1 row created.
+
+SQL>
+SQL> INSERT INTO Membership (MembershipID, MemberID, PlanID, Status)
+  2  VALUES (6000, 1200, 2, 'ACTIVE');
+
+1 row created.
+
+SQL>
+SQL> COMMIT;
+
+Commit complete.
+
+SQL> SELECT * FROM Member WHERE MemberID = 1300;
+
+  MEMBERID NAME                                                HOMEGYMID
+---------- -------------------------------------------------- ----------
+      1300 T User                                                      1
+
+SQL>  SELECT * FROM Member WHERE MemberID = 1300;
+
+no rows selected
+
+SQL>

@@ -1,0 +1,71 @@
+U:
+
+cd SQL\project\gym.sql
+
+sqlplus OKORO1GC/KqCma4fh9lBYJmbl@cps-orcl4.se.cmich.edu/orcl4
+
+set linesize 150
+
+set pagesize 50
+
+set echo on
+
+@U:\SQL\project\gym.sql
+
+
+SELECT COUNT(*) AS TotalMembers FROM Member;
+
+SELECT MemberID, Name
+FROM Member
+ORDER BY MemberID;
+
+SELECT m.MemberID, m.Name, g.GymName, ms.Status
+FROM Member m
+LEFT JOIN GymLocation g ON m.HomeGymID = g.GymID
+LEFT JOIN Membership ms ON m.MemberID = ms.MemberID
+ORDER BY m.MemberID;
+
+
+SELECT * FROM ActiveMembers;
+
+SELECT COUNT(*) AS TotalCheckIns
+FROM CheckIn;
+
+
+INSERT INTO CheckIn (CheckInID, MemberID, GymID, CheckInTime)
+VALUES (999, 1002, 2, SYSTIMESTAMP);
+
+----------------------------------------------------------------------
+
+
+U:
+cd \SQL\project
+python gym_gui.py
+
+INSERT INTO Member (MemberID, Name, HomeGymID)
+VALUES (1200, 'Test User', 1);
+
+INSERT INTO Membership (MembershipID, MemberID, PlanID, Status)
+VALUES (6000, 1200, 2, 'ACTIVE');
+
+COMMIT;
+
+
+
+
+
+Trigger check in ID for expired member: 1002
+
+
+pip install oracledb
+
+
+Add in GUI
+
+SELECT * FROM Member WHERE MemberID = 1300;
+
+
+DELETE FROM CheckIn WHERE MemberID = 1300;
+DELETE FROM Membership WHERE MemberID = 1300;
+DELETE FROM Member WHERE MemberID = 1300;
+
